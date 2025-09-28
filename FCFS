@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificación FCFS</title>
+    <style>
+        body {
+            font-family: 'Verdana', sans-serif;
+            background-color: #f5f5f5;
+            color: #2d3142;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            margin: 0;
+            height: 100vh;
+        }
+        .contenedor-principal {
+            width: 95%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .seccion-formulario {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            margin-top: 20px;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .seccion-formulario h1 {
+            font-size: 1.8em;
+            color: #2d3142;
+            margin-bottom: 20px;
+        }
+        label {
+            font-size: 1em;
+            color: #2d3142;
+            text-align: left;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #6c63ff;
+        }
+        .seccion-formulario button {
+            width: 100%;
+            padding: 12px;
+            font-size: 1em;
+            color: #ffffff;
+            background-color: #6c63ff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        .seccion-formulario button:hover {
+            background-color: #4b47b8;
+        }
+        .seccion-resultados {
+            width: 100%;
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #eae8ff;
+            text-align: left;
+        }
+        th {
+            background-color: #aeaad1;
+        }
+        canvas {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="contenedor-principal">
+        <div class="seccion-formulario">
+            <h1>FCFS - Planificación de Procesos</h1>
+            <label for="nombreProcesoFCFS">Nombre del proceso:</label>
+            <input type="text" id="nombreProcesoFCFS" placeholder="Ej. P1">
+            
+            <label for="tiempoLlegadaFCFS">Tiempo de llegada:</label>
+            <input type="number" id="tiempoLlegadaFCFS" placeholder="Ej. 2">
+            
+            <label for="tiempoEjecucionFCFS">Tiempo de ejecución:</label>
+            <input type="number" id="tiempoEjecucionFCFS" placeholder="Ej. 4">
+            
+            <button onclick="agregarProceso()">Agregar Proceso</button>
+            <button onclick="calcularFCFS()">Calcular FCFS</button>
+        </div>
+
+        <div class="seccion-resultados">
+            <h2>Procesos</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Proceso</th>
+                        <th>Tiempo de Llegada</th>
+                        <th>Tiempo de Ejecución</th>
+                        <th>Tiempo Final</th>
+                        <th>Tiempo de Servicio</th>
+                        <th>Tiempo de Espera</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaProcesosFCFS">
+                </tbody>
+            </table>
+            <div id="promediosFCFS"></div>
+        </div>
+
+        <canvas id="graficoGantt" width="1200" height="400"></canvas>
+    </div>
+
+    <script>
+        let procesos = [];
+
+        function agregarProceso() {
+            const nombreProceso = document.getElementById("nombreProcesoFCFS").value.trim();
+            const tiempoLlegada = parseInt(document.getElementById("tiempoLlegadaFCFS").value);
+            const tiempoEjecucion = parseInt(document.getElementById("tiempoEjecucionFCFS").value);
+
+            if (nombreProceso && !isNaN(tiempoLlegada) && !isNaN(tiempoEjecucion)) {
+                procesos.push({
+                    nombre: nombreProceso,
+                    llegada: tiempoLlegada,
+                    ejecucion: tiempoEjecucion,
+                    completado: false,
+                });
+
+                document.getElementById("nombreProcesoFCFS").value = "";
+                document.getElementById("tiempoLlegadaFCFS").value = "";
+                document.getElementById("tiempoEjecucionFCFS").value = "";
+
+                actualizarTablaProcesos();
+            } else {
+                alert("Por favor, completa todos los campos correctamente.");
+            }
+        }
+
+        function calcularFCFS() {
+            let tiempoActual = 0;
+            let tiempoTotalEspera = 0;
+            let tiempoTotalServicio = 0;
+            let datosGantt = [];
+
+            procesos.sort((a, b) => a.llegada - b.llegada);
+
+            procesos.forEach((proceso, index) => {
+                if (tiempoActual < proceso.llegada) {
+                    tiempoActual = proceso.llegada;
+                }
+
+                const tiempoEspera = tiempoActual - proceso.llegada;
+                datosGantt.push({
+                    nombre: proceso.nombre,
+                    inicio: tiempoActual,
+                    espera: tiempoEspera,
+                    duracion: proceso.ejecucion,
+                    fin: tiempoActual + proceso.ejecucion
+                });
+
+                tiempoActual += proceso.ejecucion;
+                proceso.tiempoFinal = tiempoActual;
+                proceso.tiempoServicio = proceso.tiempoFinal - proceso.llegada;
+                proceso.tiempoEspera = proceso.tiempoServicio - proceso.ejecucion;
+
+                tiempoTotalEspera += proceso.tiempoEspera;
+                tiempoTotalServicio += proceso.tiempoServicio;
+            });
+
+            actualizarTablaProcesos();
+            mostrarPromedios(tiempoTotalEspera, tiempoTotalServicio);
+            dibujarGraficoGantt(datosGantt);
+        }
+
+        function actualizarTablaProcesos() {
+            const cuerpoTabla = document.getElementById("tablaProcesosFCFS");
+            cuerpoTabla.innerHTML = "";
+
+            procesos.forEach(proceso => {
+                const fila = cuerpoTabla.insertRow();
+                fila.insertCell(0).textContent = proceso.nombre;
+                fila.insertCell(1).textContent = proceso.llegada;
+                fila.insertCell(2).textContent = proceso.ejecucion;
+                fila.insertCell(3).textContent = proceso.tiempoFinal;
+                fila.insertCell(4).textContent = proceso.tiempoServicio;
+                fila.insertCell(5).textContent = proceso.tiempoEspera;
+            });
+        }
+
+        function mostrarPromedios(tiempoTotalEspera, tiempoTotalServicio) {
+            const promedioEspera = (tiempoTotalEspera / procesos.length).toFixed(2);
+            const promedioServicio = (tiempoTotalServicio / procesos.length).toFixed(2);
+
+            const divPromedios = document.getElementById("promediosFCFS");
+            divPromedios.innerHTML = `
+                Promedio de Tiempo de Espera: ${promedioEspera} <br>
+                Promedio de Tiempo de Servicio: ${promedioServicio}
+            `;
+        }
+
+        function dibujarGraficoGantt(datos) {
+            const ctx = document.getElementById("graficoGantt").getContext("2d");
+            const etiquetas = datos.map(item => item.nombre);
+            const tiemposInicio = datos.map(item => item.inicio);
+            const tiemposPrevios = datos.map((item, index) => {
+                return index === 0 ? 0 : datos[index - 1].fin;
+            });
+            const duraciones = datos.map(item => item.duracion);
+
+            // Crear los datasets para el gráfico de barras apiladas
+            const datasetTiempoPrevio = {
+                label: 'Tiempo Total Anterior',
+                data: tiemposPrevios,
+                backgroundColor: 'rgba(34, 139, 34, 0.8)',  // Verde oscuro
+                borderColor: 'rgba(34, 139, 34, 1)',
+                borderWidth: 1,
+                stack: 'Stack 0'
+            };
+
+            const datasetEjecucion = {
+                label: 'Tiempo de Ejecución',
+                data: duraciones,
+                backgroundColor: 'rgba(255, 140, 0, 0.8)',  // Naranja oscuro
+                borderColor: 'rgba(255, 140, 0, 1)',
+                borderWidth: 1,
+                stack: 'Stack 0'
+            };
+
+            new Chart(ctx, {
+                type: 'bar',  // Tipo 'bar' para barras apiladas
+                data: {
+                    labels: etiquetas,
+                    datasets: [datasetTiempoPrevio, datasetEjecucion]
+                },
+                options: {
+                    responsive: true,
+                    indexAxis: 'y',  // Para tener barras horizontales
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            stacked: true,  // Activa las barras apiladas
+                            title: {
+                                display: true,
+                                text: 'Tiempo'
+                            },
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        y: {
+                            stacked: true,  // Activa las barras apiladas
+                            title: {
+                                display: true,
+                                text: 'Proceso'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
+</html>

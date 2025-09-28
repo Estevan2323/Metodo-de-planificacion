@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificación SJF</title>
+    <style>
+        body {
+            font-family: 'Verdana', sans-serif;
+            background-color: #f5f5f5;
+            color: #2d3142;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            margin: 0;
+            height: 100vh;
+        }
+        .contenedor {
+            width: 95%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .seccion-formulario {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            margin-top: 20px;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .seccion-formulario h1 {
+            font-size: 1.8em;
+            color: #2d3142;
+            margin-bottom: 20px;
+        }
+        label {
+            font-size: 1em;
+            color: #2d3142;
+            text-align: left;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #6c63ff;
+        }
+        .seccion-formulario button {
+            width: 100%;
+            padding: 12px;
+            font-size: 1em;
+            color: #ffffff;
+            background-color: #6c63ff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        .seccion-formulario button:hover {
+            background-color: #4b47b8;
+        }
+        .seccion-resultados {
+            width: 100%;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .seccion-resultados h2 {
+            font-size: 1.5em;
+            color: #2d3142;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #eae8ff;
+            text-align: left;
+        }
+        th {
+            background-color: #aeaad1;
+        }
+        td {
+            background-color: #f7f6ff;
+        }
+        canvas {
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="contenedor">
+        <div class="seccion-formulario">
+            <h1>SJF - Planificación de Procesos</h1>
+            <label for="nombreProcesoSJF">Nombre del proceso:</label>
+            <input type="text" id="nombreProcesoSJF"><br>
+            <label for="tiempoLlegadaSJF">Tiempo de llegada:</label>
+            <input type="number" id="tiempoLlegadaSJF"><br>
+            <label for="tiempoEjecucionSJF">Tiempo de ejecución:</label>
+            <input type="number" id="tiempoEjecucionSJF"><br>
+            <button onclick="agregarProceso()">Agregar Proceso</button>
+            <button onclick="ordenarProcesos()">Ordenar Procesos</button>
+            <button onclick="calcularSJF()">Calcular SJF</button>
+        </div>
+
+        <div class="seccion-resultados">
+            <h2>Procesos</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Proceso</th>
+                        <th>Tiempo de Llegada</th>
+                        <th>Tiempo de Ejecución</th>
+                        <th>Tiempo Final</th>
+                        <th>Tiempo de Servicio</th>
+                        <th>Tiempo de Espera</th>
+                        <th>Rendimiento del Procesador (%)</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaProcesosSJF">
+                    <!-- Aquí se llenarán los procesos -->
+                </tbody>
+            </table>
+            <div id="promediosSJF">
+                <!-- Aquí se mostrarán los promedios -->
+            </div>
+            <canvas id="graficoGantt"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let procesos = [];
+
+        function agregarProceso() {
+            const nombreProceso = document.getElementById("nombreProcesoSJF").value;
+            const tiempoLlegada = document.getElementById("tiempoLlegadaSJF").value;
+            const tiempoEjecucion = document.getElementById("tiempoEjecucionSJF").value;
+
+            if (!nombreProceso || tiempoLlegada === "" || tiempoEjecucion === "") {
+                alert("Por favor, complete todos los campos.");
+                return;
+            }
+
+            procesos.push({
+                nombre: nombreProceso,
+                llegada: parseInt(tiempoLlegada),
+                ejecucion: parseInt(tiempoEjecucion),
+                tiempoFinal: 0,
+                tiempoServicio: 0,
+                tiempoEspera: 0,
+            });
+
+            document.getElementById("nombreProcesoSJF").value = "";
+            document.getElementById("tiempoLlegadaSJF").value = "";
+            document.getElementById("tiempoEjecucionSJF").value = "";
+
+            actualizarTablaProcesos();
+        }
+
+        function ordenarProcesos() {
+            try {
+                let posicion;
+                let aux;
+                let auxN;
+                let tiempoE = [];
+                let nombres = [];
+
+                // Recolectar los nombres y tiempos de ejecución
+                procesos.forEach(proceso => {
+                    tiempoE.push(proceso.ejecucion);
+                    nombres.push(proceso.nombre);
+                });
+
+                // Convertir las listas a arrays y aplicar el método de inserción
+                for (let i = 1; i < tiempoE.length; i++) {
+                    posicion = i;
+                    aux = tiempoE[i];
+                    auxN = nombres[i];
+
+                    while (posicion > 0 && tiempoE[posicion - 1] > aux) {
+                        tiempoE[posicion] = tiempoE[posicion - 1];
+                        nombres[posicion] = nombres[posicion - 1];
+                        posicion--;
+                    }
+                    tiempoE[posicion] = aux;
+                    nombres[posicion] = auxN;
+                }
+
+                // Actualizar los procesos con los valores ordenados
+                procesos = procesos.map((proceso, index) => ({
+                    ...proceso,
+                    nombre: nombres[index],
+                    ejecucion: tiempoE[index],
+                }));
+
+                alert("Procesos ordenados por tiempo de ejecución.");
+                actualizarTablaProcesos();
+            } catch (error) {
+                console.error("Error al ordenar los procesos:", error);
+                alert("Error al ordenar los procesos: " + error.message);
+            }
+        }
+
+        function calcularSJF() {
+            let tiempoActual = 0;
+            let tiempoTotalEspera = 0;
+            let tiempoTotalServicio = 0;
+
+            procesos.sort((a, b) => a.llegada === b.llegada ? a.ejecucion - b.ejecucion : a.llegada - b.llegada);
+
+            procesos.forEach(proceso => {
+                if (tiempoActual < proceso.llegada) {
+                    tiempoActual = proceso.llegada;
+                }
+                proceso.tiempoEspera = tiempoActual - proceso.llegada;
+                proceso.tiempoFinal = tiempoActual + proceso.ejecucion;
+                proceso.tiempoServicio = proceso.tiempoFinal - proceso.llegada;
+
+                tiempoActual += proceso.ejecucion;
+                tiempoTotalEspera += proceso.tiempoEspera;
+                tiempoTotalServicio += proceso.tiempoServicio;
+            });
+
+            actualizarTablaProcesos();
+            mostrarPromedios(tiempoTotalEspera, tiempoTotalServicio);
+            graficarGantt();
+        }
+
+        function actualizarTablaProcesos() {
+            const cuerpoTabla = document.getElementById("tablaProcesosSJF");
+            cuerpoTabla.innerHTML = "";
+
+            procesos.forEach(proceso => {
+                const fila = cuerpoTabla.insertRow();
+                fila.insertCell(0).textContent = proceso.nombre;
+                fila.insertCell(1).textContent = proceso.llegada;
+                fila.insertCell(2).textContent = proceso.ejecucion;
+                fila.insertCell(3).textContent = proceso.tiempoFinal;
+                fila.insertCell(4).textContent = proceso.tiempoServicio;
+                fila.insertCell(5).textContent = proceso.tiempoEspera;
+                fila.insertCell(6).textContent = ((proceso.ejecucion / proceso.tiempoServicio) * 100).toFixed(2);
+            });
+        }
+
+        function mostrarPromedios(tiempoTotalEspera, tiempoTotalServicio) {
+            const promedioEspera = (tiempoTotalEspera / procesos.length).toFixed(2);
+            const promedioServicio = (tiempoTotalServicio / procesos.length).toFixed(2);
+
+            const divPromedios = document.getElementById("promediosSJF");
+            divPromedios.innerHTML = `
+                Promedio de Tiempo de Espera: ${promedioEspera} <br>
+                Promedio de Tiempo de Servicio: ${promedioServicio}
+            `;
+        }
+
+        function graficarGantt() {
+            const ctx = document.getElementById('graficoGantt').getContext('2d');
+            const colores = ['rgba(39, 174, 96, 0.9)', 'rgba(192, 57, 43, 0.9)', 'rgba(41, 128, 185, 0.9)', 'rgba(142, 68, 173, 0.9)', 'rgba(44, 62, 80, 0.9)'];
+
+            const datosGrafico = {
+                labels: procesos.map(p => p.nombre),
+                datasets: [{
+                    label: 'Procesos',
+                    data: procesos.map(p => ({
+                        x: [p.llegada, p.tiempoFinal],
+                        y: p.nombre,
+                    })),
+                    backgroundColor: colores,
+                    borderColor: colores,
+                    borderWidth: 1,
+                }]
+            };
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    datasets: datosGrafico.datasets,
+                },
+                options: {
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: 'Tiempo'
+                            },
+                            min: 0,
+                            ticks: {
+                                stepSize: 1,
+                            },
+                            stacked: true,
+                            beginAtZero: true
+                        },
+                        y: {
+                            type: 'category',
+                            title: {
+                                display: true,
+                                text: 'Procesos'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    const inicio = tooltipItem.raw.x[0];
+                                    const fin = tooltipItem.raw.x[1];
+                                    return `Inicio: ${inicio}, Fin: ${fin}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

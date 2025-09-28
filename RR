@@ -1,0 +1,499 @@
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificación RR</title>
+    <style>
+        body {
+            font-family: 'Verdana', sans-serif;
+            background-color: #f5f5f5;
+            color: #2d3142;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            margin: 0;
+            height: 100vh;
+        }
+        .container-header {
+            width: 95%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .formulario {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            margin-top: 20px;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .formulario h1 {
+            font-size: 1.8em;
+            color: #2d3142;
+            margin-bottom: 20px;
+        }
+        label {
+            font-size: 1em;
+            color: #2d3142;
+            text-align: left;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #6c63ff;
+        }
+        .formulario button {
+            width: 100%;
+            padding: 12px;
+            font-size: 1em;
+            color: #ffffff;
+            background-color: #6c63ff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        .formulario button:hover {
+            background-color: #4b47b8;
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #eae8ff;
+            text-align: center;
+        }
+        th {
+            background-color: #aeaad1;
+        }
+        td {
+            background-color: #f7f6ff;
+        }
+        .orden-ejecucion {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .orden-ejecucion table {
+            margin: auto;
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1.2rem;
+        }
+        .orden-ejecucion td {
+            padding: 10px;
+            border: 1px solid #2d3142;
+            min-width: 40px;
+        }
+        #contenedorGraficas {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .envolturaGrafica {
+            width: 400px;
+            height: 300px;
+            margin: 10px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div class="container-header">
+        <h1>RR - Planificación de Procesos</h1>
+    </div>
+
+    <div class="formulario">
+        <h1>Entrada de Procesos</h1>
+        <label for="nombreProcesoRR">Nombre del proceso:</label><br>
+        <input type="text" id="nombreProcesoRR" required><br>
+        <label for="tiempoLlegadaRR">Tiempo de llegada:</label><br>
+        <input type="number" id="tiempoLlegadaRR" required min="0"><br>
+        <label for="tiempoRafagaRR">Tiempo de ejecución:</label><br>
+        <input type="number" id="tiempoRafagaRR" required min="1"><br>
+        <label for="quantum">Tiempo Cuántico:</label><br>
+        <input type="number" id="quantum" required min="1">
+        <button onclick="agregarProceso()">Agregar Proceso</button>
+        <button onclick="calcularRR()">Calcular RR</button>
+        <button onclick="mostrarOrdenEjecucion()">Mostrar Orden de Ejecución</button>
+        <button onclick="mostrarGraficas()">Mostrar Gráficas</button>
+    </div>
+
+    <div class="seccion-resultados">
+        <h2>Procesos</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Proceso</th>
+                    <th>Tiempo de Llegada</th>
+                    <th>Tiempo de Ejecución</th>
+                    <th>Tiempo Final</th>
+                    <th>Tiempo de Servicio</th>
+                    <th>Tiempo de Espera</th>
+                    <th>Rendimiento del Procesador (%)</th>
+                </tr>
+            </thead>
+            <tbody id="tablaProcesosRR"></tbody>
+        </table>
+    </div>
+
+    <div id="promediosRR"></div>
+
+    <div class="orden-ejecucion">
+        <h2>Orden de Ejecución</h2>
+        <table id="tablaOrdenEjecucion">
+            <tr id="filaProceso"></tr>
+            <tr id="filaTiempo"></tr>
+        </table>
+    </div>
+
+    <div id="contenedorGraficas"></div>
+
+    <script>
+        let procesos = [];
+        let tiempoQuantum = 0;
+        let datosGantt = [];
+        let instanciasGraficas = [];
+
+        function agregarProceso() {
+            const nombreProceso = document.getElementById("nombreProcesoRR").value;
+            const tiempoLlegada = parseInt(document.getElementById("tiempoLlegadaRR").value);
+            const tiempoRafaga = parseInt(document.getElementById("tiempoRafagaRR").value);
+
+            if (nombreProceso && tiempoLlegada >= 0 && tiempoRafaga > 0) {
+                procesos.push({
+                    nombre: nombreProceso,
+                    llegada: tiempoLlegada,
+                    rafaga: tiempoRafaga,
+                    rafagaOriginal: tiempoRafaga,
+                    completado: false,
+                    tiempoEspera: 0,
+                    tiempoServicio: 0,
+                    tiempoFinalizacion: 0
+                });
+
+                document.getElementById("nombreProcesoRR").value = "";
+                document.getElementById("tiempoLlegadaRR").value = "";
+                document.getElementById("tiempoRafagaRR").value = "";
+                actualizarTablaProcesos();
+            } else {
+                alert("Por favor, completa todos los campos correctamente.");
+            }
+        }
+
+        function calcularRR() {
+            if (procesos.length === 0) {
+                alert("Debe agregar procesos primero.");
+                return;
+            }
+
+            let cola = [...procesos];
+            let tiempoActual = 0;
+            datosGantt = [];
+            let ordenEjecucion = [];
+            let tiempoServicioTotal = 0;
+            let tiempoEsperaTotal = 0;
+            tiempoQuantum = parseInt(document.getElementById("quantum").value);
+
+            while (cola.length > 0) {
+                let procesoEjecutado = false;
+
+                for (let i = 0; i < cola.length; i++) {
+                    let procesoActual = cola[i];
+
+                    if (procesoActual.llegada <= tiempoActual) {
+                        procesoEjecutado = true;
+                        cola.splice(i, 1);
+
+                        if (procesoActual.rafaga > tiempoQuantum) {
+                            ordenEjecucion.push(procesoActual.nombre);
+                            datosGantt.push({
+                                proceso: procesoActual.nombre,
+                                inicio: tiempoActual,
+                                fin: tiempoActual + tiempoQuantum
+                            });
+                            tiempoActual += tiempoQuantum;
+                            procesoActual.rafaga -= tiempoQuantum;
+                            cola.push(procesoActual); // Reagregar a la cola si no ha terminado
+                        } else {
+                            ordenEjecucion.push(procesoActual.nombre);
+                            datosGantt.push({
+                                proceso: procesoActual.nombre,
+                                inicio: tiempoActual,
+                                fin: tiempoActual + procesoActual.rafaga
+                            });
+                            tiempoActual += procesoActual.rafaga;
+                            procesoActual.rafaga = 0;
+
+                            // Calcular tiempos
+                            procesoActual.completado = true;
+                            procesoActual.tiempoFinalizacion = tiempoActual;
+                            procesoActual.tiempoServicio = procesoActual.tiempoFinalizacion - procesoActual.llegada;
+                            procesoActual.tiempoEspera = procesoActual.tiempoServicio - procesoActual.rafagaOriginal;
+                            procesoActual.utilizacionCPU = ((procesoActual.rafagaOriginal / procesoActual.tiempoServicio) * 100).toFixed(2);
+
+                            tiempoServicioTotal += procesoActual.tiempoServicio;
+                            tiempoEsperaTotal += procesoActual.tiempoEspera;
+                        }
+                        break; // Rompemos el ciclo y volvemos a revisar la cola
+                    }
+                }
+
+                if (!procesoEjecutado) {
+                    tiempoActual++;
+                }
+            }
+
+            actualizarTablaProcesos();
+            mostrarPromedios();
+        }
+
+        function actualizarTablaProcesos() {
+            const cuerpoTabla = document.getElementById("tablaProcesosRR");
+            cuerpoTabla.innerHTML = "";
+
+            procesos.forEach(proceso => {
+                const fila = cuerpoTabla.insertRow();
+                fila.insertCell(0).textContent = proceso.nombre;
+                fila.insertCell(1).textContent = proceso.llegada;
+                fila.insertCell(2).textContent = proceso.rafagaOriginal;
+                fila.insertCell(3).textContent = proceso.completado ? proceso.tiempoFinalizacion : "-";
+                fila.insertCell(4).textContent = proceso.completado ? proceso.tiempoServicio : "-";
+                fila.insertCell(5).textContent = proceso.completado ? proceso.tiempoEspera : "-";
+                fila.insertCell(6).textContent = proceso.completado ? proceso.utilizacionCPU : "-";
+            });
+        }
+
+        function mostrarPromedios() {
+            const tiempoEsperaTotal = procesos.reduce((acc, p) => acc + (p.tiempoEspera || 0), 0);
+            const tiempoServicioTotal = procesos.reduce((acc, p) => acc + (p.tiempoServicio || 0), 0);
+            const promedioEspera = (tiempoEsperaTotal / procesos.length).toFixed(2);
+            const promedioServicio = (tiempoServicioTotal / procesos.length).toFixed(2);
+
+            document.getElementById("promediosRR").innerHTML = `<p>Tiempo promedio de espera: ${promedioEspera}</p>
+                                                               <p>Tiempo promedio de servicio: ${promedioServicio}</p>`;
+        }
+
+        function mostrarOrdenEjecucion() {
+            const tablaOrdenEjecucion = document.getElementById("tablaOrdenEjecucion");
+            tablaOrdenEjecucion.innerHTML = ""; // Limpiar la tabla antes de agregar los datos
+
+            const filaProceso1 = document.createElement("tr");
+            const filaTiempo1 = document.createElement("tr");
+            const filaProceso2 = document.createElement("tr");
+            const filaTiempo2 = document.createElement("tr");
+
+            const mitad = Math.ceil(datosGantt.length / 2);
+            let tiempo = 0;
+
+            // Llenar la primera mitad en las filas superiores
+            datosGantt.slice(0, mitad).forEach(item => {
+                // Crear celdas para los nombres de los procesos
+                const celdaProceso = document.createElement("td");
+                celdaProceso.textContent = item.proceso;
+                filaProceso1.appendChild(celdaProceso);
+
+                // Crear celdas para los tiempos de inicio y fin
+                const celdaTiempo = document.createElement("td");
+                celdaTiempo.textContent = `${tiempo} - ${tiempo + 1}`;
+                filaTiempo1.appendChild(celdaTiempo);
+
+                tiempo += 1; // Incrementar el tiempo en 1 unidad
+            });
+
+            // Llenar la segunda mitad en las filas inferiores
+            datosGantt.slice(mitad).forEach(item => {
+                // Crear celdas para los nombres de los procesos
+                const celdaProceso = document.createElement("td");
+                celdaProceso.textContent = item.proceso;
+                filaProceso2.appendChild(celdaProceso);
+
+                // Crear celdas para los tiempos de inicio y fin
+                const celdaTiempo = document.createElement("td");
+                celdaTiempo.textContent = `${tiempo} - ${tiempo + 1}`;
+                filaTiempo2.appendChild(celdaTiempo);
+
+                tiempo += 1; // Incrementar el tiempo en 1 unidad
+            });
+
+            // Agregar las filas a la tabla
+            tablaOrdenEjecucion.appendChild(filaProceso1);
+            tablaOrdenEjecucion.appendChild(filaTiempo1);
+            tablaOrdenEjecucion.appendChild(filaProceso2);
+            tablaOrdenEjecucion.appendChild(filaTiempo2);
+        }
+
+        function mostrarGraficas() {
+            if (procesos.length === 0) {
+                alert("Debe agregar y calcular los procesos primero.");
+                return;
+            }
+
+            const contenedorGraficas = document.getElementById("contenedorGraficas");
+            contenedorGraficas.innerHTML = "";
+
+            const selectorProcesos = document.createElement("select");
+            procesos.forEach(proceso => {
+                const opcion = document.createElement("option");
+                opcion.value = proceso.nombre;
+                opcion.textContent = proceso.nombre;
+                selectorProcesos.appendChild(opcion);
+            });
+
+            const panelSuperior = document.createElement("div");
+            panelSuperior.style.textAlign = "center";
+            panelSuperior.style.marginBottom = "20px";
+            panelSuperior.appendChild(document.createTextNode("Selecciona el proceso a graficar: "));
+            panelSuperior.appendChild(selectorProcesos);
+            contenedorGraficas.appendChild(panelSuperior);
+
+            const panelGrafica = document.createElement("canvas");
+            panelGrafica.id = "lienzoGrafica";
+            contenedorGraficas.appendChild(panelGrafica);
+
+            let procesoInicial = selectorProcesos.options[0].value;
+            actualizarGrafica(procesoInicial);
+
+            selectorProcesos.addEventListener("change", () => {
+                actualizarGrafica(selectorProcesos.value);
+            });
+        }
+
+        function actualizarGrafica(nombreProceso) {
+            const proceso = procesos.find(p => p.nombre === nombreProceso);
+            if (!proceso) return;
+
+            let rafagaRestante = proceso.rafagaOriginal;
+            let tiempoAcumulado = proceso.llegada;
+            let etiquetas = [];
+            let datos = [];
+
+            for (let i = 0; i < datosGantt.length; i++) {
+                if (datosGantt[i].proceso === proceso.nombre) {
+                    const tiempoEjecucion = datosGantt[i].inicio;
+                    const quantumUsado = Math.min(rafagaRestante, tiempoQuantum);
+
+                    etiquetas.push(tiempoEjecucion);
+                    let progreso = 100 * (1 - rafagaRestante / proceso.rafagaOriginal);
+                    progreso = Math.max(0, Math.min(100, progreso));
+                    datos.push(progreso);
+
+                    tiempoAcumulado = tiempoEjecucion + quantumUsado;
+                    rafagaRestante -= quantumUsado;
+
+                    etiquetas.push(tiempoAcumulado);
+                    progreso = 100 * (1 - rafagaRestante / proceso.rafagaOriginal);
+                    progreso = Math.max(0, Math.min(100, progreso));
+                    datos.push(progreso);
+                }
+            }
+
+            if (rafagaRestante <= 0) {
+                etiquetas.push(tiempoAcumulado);
+                datos.push(100);
+            }
+
+            if (window.instanciaGrafica) {
+                window.instanciaGrafica.destroy();
+            }
+
+            const lienzo = document.getElementById("lienzoGrafica");
+            lienzo.width = 800;
+            lienzo.height = 300;
+            const ctx = lienzo.getContext("2d");
+
+            window.instanciaGrafica = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: etiquetas,
+                    datasets: [{
+                        label: `Progreso del Proceso ${proceso.nombre}`,
+                        data: datos,
+                        borderColor: "darkblue",
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        pointBackgroundColor: "darkblue",
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: "Tiempo (Llegada y Salida)"
+                            },
+                            ticks: {
+                                beginAtZero: true,
+                                stepSize: 1,
+                                precision: 0,
+                                maxRotation: 0,
+                                minRotation: 0
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: "Progreso (%)"
+                            },
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                beginAtZero: true,
+                                stepSize: 10,
+                                precision: 0
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: "top"
+                        },
+                        tooltip: {
+                            enabled: true,
+                            mode: "index",
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function obtenerColorAleatorio() {
+            const letras = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letras[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+    </script>
+</body>
+</html>
